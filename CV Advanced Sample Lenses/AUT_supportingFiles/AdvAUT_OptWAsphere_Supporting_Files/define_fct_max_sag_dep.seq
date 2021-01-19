@@ -1,0 +1,43 @@
+!	Macro function for controlling asphericity
+!	with respect to best-fit sphere.
+!	Return value is the maximum sag departure (sag difference)
+!	between the best-fit sphere and the asphere.
+!	Sag difference is computed along local normal to the best-fit sphere.
+!	If entered max Y height is 0, then it uses surface's MAP
+!	(default clear aperture, or user-entered aperture, if one exists)
+!	as max. Y height.
+!	(MAP is updated automatically as AUT runs.)
+!
+wri "Defining macro function @MAX_SAG_DEP."
+wri "Computes worst-case sag departure of surface S from best fit sphere."
+wri "Best fit sphere contacts the asphere at center and specified max y"
+wri "  Argument 1 = surface number S (the asphere)"
+wri "  Argument 2 = number of y sampling heights"
+wri "  Argument 3 = maximum y (0 will use MAP value)"
+wri "  NOTE:  If Argument 3 = 0, then it gets and uses the MAP on that surface."
+wri "         MAP is dynamically updated if used in AUT."
+wri "  NOTE:  Sag departure is measured normal to best-fit sphere."
+!
+!
+FCT @MAX_SAG_DEP(num ^surf, num ^n_samples, num ^ymax)
+LCL num ^y ^z ^j ^marg_sag ^best_fit_rad ^dy ^s ^q ^sag_dep ^max_sag_dep 
+!  Compute best-fit sphere as contacting at center and edge
+if ^ymax=0
+	^ymax == (MAP s^surf)
+end if
+^marg_sag == sagf(^surf,1,0,^ymax)
+^best_fit_rad == (^marg_sag*^marg_sag + ^ymax*^ymax)/2/^marg_sag
+!  Find maximum sag departure
+!  Measured normal to best-fit sphere
+^dy == ^ymax/^n_samples
+^max_sag_dep == 0
+for ^j 1 ^n_samples
+	^y == ^j*^dy
+	^z == sagf(^surf,1,0,^y)
+	^s == ^best_fit_rad - ^z
+	^q == ^y*^y + ^s*^s
+	^sag_dep == (^y*^y - ^z*(^best_fit_rad+^s))/(^best_fit_rad+signf(sqrtf(^q),^best_fit_rad))
+	^max_sag_dep == maxf(^max_sag_dep,absf(^sag_dep))
+end for
+end fct ^max_sag_dep
+LVR FCT

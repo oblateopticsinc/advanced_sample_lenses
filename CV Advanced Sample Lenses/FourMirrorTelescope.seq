@@ -1,0 +1,24 @@
+rdm; len
+tit "Four Mirror Unobscured Telescope"
+epd 33.333
+dim c
+wl 8000
+xan 0 0 0 2.5 2.5
+yan -.75 0 .75 -.75 .75
+s 0 60; sto	    ! dummy stop (s1)
+  yde 21.42158; dar	
+s -120 -90 refl	    ! primary mirror (s2)
+  con; k -1
+s 39 58.97836 refl   ! secondary mirror (s3)
+  con; k -.1066556
+  yde .809468; ade -3.76506; dar
+s -158.866382 -58.6904 refl 	! tertiary mirror (s4)
+  asp; a -.716e-5; b .3663e-7
+  yde -18.6717; ade 20.80885; ben
+s 61.18708 60.30595 refl  	! fourth mirror (s5)
+  con; k -.044426
+  yde -11.585; ade 19.16485; ben
+  pim
+si 0 -7.93547
+  yde -22.1397; ade -35.25354; dar
+go

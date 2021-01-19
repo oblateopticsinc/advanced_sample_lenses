@@ -1,0 +1,36 @@
+!	Example of converting SPS ZFR to SPS XYP with SAGFIT5 macro
+!	This example uses terms up to 6th order
+!
+!	Start with sample lens SINGLET
+res cv_lens:singlet
+!	Convert S1 to SPS ZFR, default norm. radius = SD
+!	Use random numbers for coefs from C2 to C26
+sps s1 zfr
+^s == 1
+^mag == .2
+for ^c 4 25
+	sco s^s c^c ^mag*(randf-.5)
+end for
+!	Clear out buffers to use for sag data
+buf?
+buf del b1..3
+!	Run 2D sag table macro.  It uses first available buffers,
+!	so proper sag table will be in B2.  Default grid is 21x21 points over clear aperture.
+!	"1" argument is the surface number
+!	"B" argument means sample over a centered circular area, default radius = SD
+in sagtable_2D 1 B 
+!	Now run SAGFIT5; the argument "2" is the buffer number with the sag data
+in sagfit5 2 "SPS XYP"
+!	Set norm. radius and vary the terms up to Y**6
+sco s2 nradius 10
+sur s2
+^s == 2
+for ^c 2 28
+	scc s^s c^c 0
+end for
+!	Vary ZDE of surface being fitted.  This allows for piston,
+!	which ZFR has but XYP doesn't!
+zdc s2 0
+in sagfitaut
+!	Should be getting very low RMS fitting error,
+!	as these surface types allow an exact fit.

@@ -1,0 +1,63 @@
+!	Macro for plotting sag fit residuals for 2D (Y,Z) or 3D (X,Y,Z) dataset.
+!	Can plot residuals vs. X or Y.  (For 3D dataset, Y or X is collapsed into plane of graph.)
+!	For use after SAGFITn and SAGFITAUT are run.
+!	Utilizes global macro variables created by SAGFIT2.
+!	Assumes ^NUMPTS of Y,Z or X,Y,Z data is in buffer B^sagbuf.
+!	Assumes current "lens" is the SAGFIT fitting setup,
+!	with S1 = flat reference surface & S2 = fitted surface
+!
+!	Author:	J. Isenberg
+!
+!	History:	16-Jan-2003		First written
+!			14-Jan-2015		Modified to work with both 2D and 3D datasets
+!
+!	Arguments:	None (but assumes global variables ^NUMPTS & ^SAGBUF are defined)
+!
+!	Find an empty buffer after ^SAGBUF in
+!	which to stash sag differences.
+!
+GBL NUM ^resbuf ^sagbuf ^numpts
+LCL NUM ^rmsfiterror ^i ^x ^y ^bad ^diff ^n
+for ^resbuf ^sagbuf 999
+	if (buf.emp b^resbuf)
+		goto got_buffer
+	end if
+end for
+LBL got_buffer
+!
+!	Calculate differences & put in that buffer.
+!	Also compute RMS fit error for display.
+!
+^rmsfiterror == 0
+for ^i 1 ^NUMPTS
+	^x == (buf.num b^sagbuf i^i j1)
+	^y == (buf.num b^sagbuf i^i j2)
+	^bad == raysin(0,0,^x,^y,0,0)
+	if not ^bad
+		^diff == (z s2 g1)-(buf.num b^sagbuf i^i j3)
+		buf put b^resbuf i^i ^x ^diff
+		^rmsfiterror == ^rmsfiterror + ^diff**2
+	end if
+end for
+!
+!	Plot the differences with UGR.
+!
+ugr;xla 'X';yla 'Sag difference (fitted-actual)'
+^title == concat('Sag fit residuals for data in   ',^filename)
+^title == concat(^title,' fit to ')
+^title == concat(^title,(typ sur s2))
+title ^title
+dtb b^resbuf ia ja PNT 'Sag difference'
+go
+!
+^n == (buf.LST b^resbuf)
+^rmsfiterror == sqrtf(^rmsfiterror/^n)
+wri "RMS fit error =" ^rmsfiterror
+wri "Includes decenters & tilts of S2 (if any)."
+if ^n <> ^numpts
+	wri "WARNING: Not all SIN rays for sag evaluation intersected S2."
+	wri q"'d' of 'd' rays succeeded." ^n ^numpts
+else
+	wri "You can also calculate the RMS fit error with"
+	wri "EVA sqrtf((AUT.ERF)/^NUMPTS)"
+end if

@@ -1,0 +1,57 @@
+out n
+ver n
+RDM;LEN       "VERSION: 9.60 SR2       LENS VERSION: 72       Creation Date: 28-Jan-2006"
+TITLE 'MTF Opt. Demo -     Petzval Lens'
+EPD   50.0
+DIM   M
+WL    656.3 587.6 486.1
+REF   2
+WTW   1 1 1
+INI   'ORA'
+XAN   0.0 0.0 0.0
+YAN   0.0 5.0 7.0
+WTF   1.0 1.0 1.0
+VUY   0.0 0.0 0.0
+VLY   0.0 0.0 0.0
+SO    0.0 989771722685.0
+S     91.6505513719 21.6760007268 NSK4_SCHOTT
+  CCY 0
+S     -83.383880544 3.48399646385 LAFN7_SCHOTT
+  CCY 0
+S     0 80.5772990706
+  THC 0
+  STO
+S     49.7867670096 17.3605960159 NSK10_SCHOTT
+  CCY 0
+S     -83.8680054477 3.48399646385 SF4_SCHOTT
+  CCY 0
+S     0 28.1524372688
+  THC 0
+S     -66.6613682535 1.96964572814 SF4_SCHOTT
+  CCY 0
+S     103.800475209 2.77410241394
+  CCY 0
+  PIM
+SI    0.0 -0.0618534594635
+  THC 0
+GO 
+
+out y
+wri
+wri "Default Blur Spot Optimization"
+wri
+
+aut
+efl = 100
+imc > 2
+go
+
+vie;go
+
+mtf;mfr 50;ifr 5;cht fre ;go
+out y
+
+
+
+
+

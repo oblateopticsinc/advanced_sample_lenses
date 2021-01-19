@@ -1,0 +1,53 @@
+!Set up the system
+RDM;LEN       
+NAO   0.15
+DIM   M
+WL    587.5618
+POL   Y
+SO    0.0 20.0
+S     0.0 0.0
+  STO
+S     0.0 0.1
+  POP LIN 1.0
+  CIR EDG 3.03
+  SLB "Linear Polarizer 1"
+S     0.0 1.0
+  DAR
+  XDE 0.0; YDE 0.0; ZDE 0.0
+  ADE 0.0; BDE 0.0; CDE 90.0
+  POP LIN 1.0
+  CIR EDG 3.6
+  SLB "Linear Polarizer 2"
+S    0.0 0.0
+  SLB "Observation Plan"
+  REX EDG 4;REY EDG 4
+SI 0 0
+CA APE
+GO
+
+!Set up the system
+RDM;LEN       
+NAO   0.15
+DIM   M
+WL    587.5618
+POL   Y
+SO    0.0 20.0
+S     0.0 0.0
+  STO
+S     0.0 0.1
+  POP LIN 1.0
+  CIR EDG 3.03
+  SLB "Linear Polarizer 1"
+S     0.0 1.0
+  DAR
+  XDE 0.0; YDE 0.0; ZDE 0.0
+  ADE 0.0; BDE 0.0; CDE 90.0
+  POP LIN 1.0
+  CIR EDG 3.6
+  SLB "Linear Polarizer 2"
+S    0.0 0.0
+  SLB "Observation Plan"
+  REX EDG 4;REY EDG 4
+SI 0 0
+CA APE
+GO

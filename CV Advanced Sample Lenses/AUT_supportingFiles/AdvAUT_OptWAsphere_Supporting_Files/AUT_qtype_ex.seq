@@ -1,0 +1,29 @@
+!Step 1: Restore Lens
+res AUT_ASP_Start
+vie;fan;go
+
+!Step 2: Optimize Lens and analyze
+!Optimize with Aspheres
+aut;
+efl=(efl);dra y;efp y;
+go
+
+wav;go
+!Opt with Aspheres WAV 0.087 composite in 14 cycles
+
+!Step 3: Convert to QCN; define variables
+res AUT_QCN_Start
+
+!Step 4: Optimize Lens and analyze
+!Re-optimize with appropriate constraints
+aut;
+efl=(efl);dra y;efp y;
+!Control the normalization radius on each surface
+for ^s 2 9
+  nrf s^s > 1.05
+end for
+go
+
+wav;go
+!After Opt:
+!WAV = 0.067 in 13 cycles

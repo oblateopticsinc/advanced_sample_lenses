@@ -1,0 +1,46 @@
+RDM; LEN	
+EPD 50	
+WL 550		
+AFI 100	
+			
+S 0 20			
+				
+! Center window
+N 0 REFR BK7
+  REX 30; REY 10	
+  REX EDG 30; REY EDG 10	
+
+N 0 BK7 REFR		
+  ZDE 5		
+  REX 30; REY 10 	
+  REX EDG 30; REY EDG 10			
+! Upper window
+N 0 REFR BK7		
+  YDE 18.66; ZDE 5; ADE -30
+  REX 30; REY 10 
+  REX EDG 30; REY EDG 10 		 
+N 0 BK7 REFR
+  YDE 18.66; ZDE 10; ADE -30
+ REX 30; REY 10
+ REX EDG 30; REY EDG 10
+! Lower window
+N 0 REFR BK7
+  YDE -18.66; ZDE 5; ADE 30
+  REX 30; REY 10
+  REX EDG 30; REY EDG 10
+
+N 0 BK7 REFR
+  YDE -18.66; ZDE 10; ADE 30
+  REX 30; REY 10
+  REX EDG 30; REY EDG 10
+
+! Exit port surface
+N 0
+  ZDE 50
+		
+! Afocal surface
+S 0 100
+
+NSS S2..8
+	
+GO

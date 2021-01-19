@@ -1,0 +1,21 @@
+RDM; LEN
+EPD 1.85; DIM I; WL 500
+
+S 0 0; STO		! Dummy stop surface (S1 must be sequential)
+
+N -0.000001 REFL	! Reflecting cone surface
+  ASP; K -1.0718
+  ZDE 6
+  CIR EDG 1.1		! Front edge of cone
+  CIR 1.1
+  CIR HOL 0.25		! Back edge of cone
+
+N 0 REFR		! Dummy surface for exit port
+  ZDE 6.1
+
+S 0 0			! Dummy surface (Si-1 must be sequential)
+
+NSS S2..3		! Specify NSS range
+NSP S3 GL2 FOR		! Specify exit port and exit criteria
+
+GO

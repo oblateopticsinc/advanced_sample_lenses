@@ -1,0 +1,21 @@
+lcl num ^input(4) ^output(8) 
+lcl num ^start ^stop ^step ^ok
+
+buf del b2   ! Clear the output buffer
+
+^start == (buf.num b1 i1 j1)
+^stop ==  (buf.num b1 i2 j1)
+^step ==  (buf.num b1 i3 j1)
+buf del b1   ! Clear the input buffer after extracting data
+
+^rad == ^start
+^i == 1
+while ^rad <= ^stop
+	^input(2) == ^rad
+	^ok == RAYTRA(1, 1, 0, ^input, ^output)
+	buf put b2 i^i j1 ^output(1)
+	buf put b2 i^i j2 ^output(2)
+	^i == ^i + 1
+	^rad == ^rad + ^step
+end while
+

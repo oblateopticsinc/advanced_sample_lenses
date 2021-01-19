@@ -1,0 +1,15 @@
+rfd 0
+
+lcl num ^bending
+
+thc s3 100
+
+^bending == #1
+
+aut
+	err con
+	@bnd == ((cuy s1) + (cuy s2))/((cuy s1) - (cuy s2))
+	@bnd = ^bending
+go
+
+

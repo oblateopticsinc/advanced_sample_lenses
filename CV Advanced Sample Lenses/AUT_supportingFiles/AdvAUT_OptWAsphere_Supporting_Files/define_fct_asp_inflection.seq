@@ -1,0 +1,40 @@
+!	Macro function to compute whether sign of ASP sag's
+!	2nd derivative always matches sign of vertex curvature.
+!	Only uses A, B, C, D polynomial coefficients (and K).
+!	Return value = minimum[(d2z/dy2)/CUY] over the range 0 < y < ymax
+!	Need to keep it positive to avoid inflections.  Equals 1 at vertex.
+!	Possible enhancement:  Substitute osculating curvature for 2nd derivative
+!
+wri "Defining macro function @ASP_INFLECTION."
+wri "Computes minimum value (over the clear aperture) of this ratio:"
+wri "  [Radial 2nd derivative of surface S sag]/[curvature of surface S]"
+wri "This ratio = 1 at vertex and goes < 0 if there's a radial inflection"
+wri "  Argument 1 = surface number S (the ASP asphere)"
+wri "  Argument 2 = number of y sampling heights"
+wri "  Argument 3 = maximum y (Enter 0 to use MAP value)"
+wri "NOTE:  If Argument 3 = 0, then it gets and uses the MAP on that surface."
+wri "       MAP (default clear aperture radius, or user-entered aperture, if one exists)"
+wri "       is dynamically updated if used in AUT."
+wri "N.B.:  Only works for ASP surface type."
+wri "       Only uses conic K and terms A through D"
+
+FCT @asp_inflection(num ^s, num ^npts, num ^ymax)
+^s == roundf(^s)
+^npts == roundf(^npts)
+if ^ymax = 0
+	^ymax == (map s^s)
+end if
+^dy == ^ymax/^npts
+^cuy == (cuy s^s)
+^rdy == (rdy s^s)  ! Using this avoids division by 0 if CUY=0.
+^func == 1e22
+for ^i 1 ^npts
+	^y == ^i*^dy
+	^ysq == ^y*^y
+	^d2zdy2 == 1-((k s^s)+1)*^cuy**2*^ysq
+	^d2zdy2 == ^cuy/^d2zdy2/sqrtf(^d2zdy2)
+	^d2zdy2 == ^d2zdy2 + ^ysq*(12*(a s^s)+^ysq*(30*(b s^s)+^ysq*(56*(c s^s)+^ysq*90*(d s^s))))
+	^func == minf(^func,^d2zdy2*^rdy)
+end for
+end fct ^func
+LVR FCT

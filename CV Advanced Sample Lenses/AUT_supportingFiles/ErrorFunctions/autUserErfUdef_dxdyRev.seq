@@ -1,0 +1,61 @@
+!--------------------------------------------------------------------------
+! Sets up a user defined error function to minimize rms spot size.
+! Defaults of DEL, and WTA are set to match default ERF
+! Wavelength and field weights are set to 1
+!
+! Example:
+!     res CV_LENS:dbgauss
+!     in autUserErfUdef_dxdy 
+!     spo; ssi .05; go
+!     
+!     res CV_LENS:dbgauss
+!     aut; efl = (efl) ; go
+!     spo; ssi .05; go
+!       
+!--------------------------------------------------------------------------
+
+rfd .385 .5
+
+^del == #1
+^wta == #2
+
+!------------------------------------------------------------
+! aut option with the user defined error fcn.
+!------------------------------------------------------------
+
+aut				
+efl=(efl)
+
+! Loop to find the coord. of ray at the edge of the grid, 
+! since the DEL is centered over (0,0)
+for ^i ^del/2 1 ^del 
+    if (1 - ^i) < ^del	
+        ^edge == ^i
+    end if
+end for
+
+err usr
+
+! Loop to define each ray in the pupil and desired aberration types
+^k == 0
+for ^i -^edge 1 ^del		! double for loop for row/col of ray grid
+    for ^j -^edge 1 ^del
+        if sqrtf(^i**2 + ^j**2) <= 1
+            ^k == ^k + 1		! counter for the current ray number
+            ent vig ^i ^j		! specifies user defined ray using vig factors
+            
+            ! sets up the aberrations for each ray with aperture weighting similar to WTA
+            ! ABR Fk Rk|Ek [Wk] [Zk] [Sk] [Gk] [Hk] quantity [aber_weight [aber_target]]
+            !   quantity - X|Y|Z|L|M|N|SRL|SRM|SRN|AOI|AOR|LEN|OPL|DX|DY|OPD|DMD
+            ^weight == (1 / ((^i)**2 + (^j)**2)**^wta)
+            abr fa e^k wa za dy ^weight 0
+            abr fa e^k wa za dx ^weight 0
+            
+        end if
+    end for
+end for
+
+abl all  ! List all aberration types used (+ weights/targets)
+apl fa 	 ! plots the user defined rays for all fields
+go
+

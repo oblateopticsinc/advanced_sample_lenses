@@ -1,0 +1,19 @@
+res cv_lens:cassrc
+dro fct @max_sag_dep
+in define_fct_max_sag_dep
+ccy s2..4 0
+thc s2..4 0
+kc s1 0
+kc s2 0
+
+in plotdfs 1
+spo;go
+
+aut; 
+@max_sag_dep(1,20,0)<.002; 
+dsp @max_sag_dep(2,20,0);
+efl=1752;
+go
+
+in plotdfs 1
+spo;go

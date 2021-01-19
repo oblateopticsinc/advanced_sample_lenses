@@ -1,0 +1,60 @@
+lcl num ^output(6)
+
+res cv_lens:Schmidt
+dro fct @asp_inflection
+in define_fct_asp_inflection.seq
+
+!in plotdfs 1
+buf del ba 
+
+^steps == 21
+^del == (MAP S1)/^steps
+
+for ^i 0 ^steps
+  ^rad == ^i*^del
+  buf put b1 i^i+1  @asp_inflection(1,30,^rad) ^rad
+  
+  eva sderivf(1,1,0,^rad,^output)
+  buf put b2 i^i+1  ^output(3) ^rad
+end for
+uch
+dtb b1 i1..l j1..l
+go
+uch
+dtb b2 i1..l j1..l
+tit 'Surface Slope - No Inflection Constraint'
+xla 'Furst Surface Derivative - dz/dy'
+yla 'Surface Height (mm)'
+go
+
+
+!eva @asp_inflection(1,30,32.7425) 
+! inflection occurs at y=32.7425
+
+!eva @asp_inflection(1,10,0) 
+! Will be < 0, since y is past the inflection
+
+aut; efl=-100; imd <-1; @asp_inflection(1,10,0)>0; go
+
+!in plotdfs 1
+buf del ba 
+
+^steps == 21
+^del == (MAP S1)/^steps
+
+for ^i 0 ^steps
+  ^rad == ^i*^del
+  buf put b1 i^i+1  @asp_inflection(1,30,^rad) ^rad
+  
+  eva sderivf(1,1,0,^rad,^output)
+  buf put b2 i^i+1  ^output(3) ^rad
+end for
+uch
+dtb b1 i1..l j1..l
+go
+uch
+dtb b2 i1..l j1..l
+tit 'Surface Slope - Inflection Constraint'
+xla 'Furst Surface Derivative - dz/dy'
+yla 'Surface Height (mm)'
+go

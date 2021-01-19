@@ -1,0 +1,46 @@
+auto
+wtf fa 1
+
+! Real focal length
+x r1 f5 si = 4.366
+
+! Clearance between 2nd mirror and rays between mirrors 3 and 4
+@sl2 == (m r2 f1 s4 g2)/(n r2 f1 s4 g2)
+@b2  == (y r2 f1 s5 g2) - @sl2*(z r2 f1 s5 g2)
+@cl2 == -@sl2*(z r2 f1 s3 g2) - @b2 + (y r2 f1 s3 g2)
+@cl2 = 5
+
+! Lyot stop clearance (formed by intersection of 2 rays)
+@sl3 == (m r2 f1 s5 g2)/(n r2 f1 s5 g2)
+@b3  == (y r2 f1 si g2) - @sl3*(z r2 f1 si g2)
+@sl4 == (m r2 f3 s5 g2)/(n r2 f3 s5 g2)
+@b4  == (y r2 f3 si g2) - @sl4*(z r2 f3 si g2)
+@zc  == (@b4 - @b3)/(@sl3 - @sl4)
+@yc  == @sl3*@zc + @b3
+@sl5 == (m r3 f3 s4 g2)/(n r3 f3 s4 g2)
+@b5  == (y r3 f3 s4 g2) - @sl5*(z r3 f3 s4 g2)
+@lcl == @sl5*@zc + @b5 - @yc
+@lcl = 5
+
+! Clearance between incoming bundle and field stop
+@sla == (m r2 f3 s2 g2)/(n r2 f3 s2 g2)
+@ba  == (y r2 f3 s3 g2) - @sla*(z r2 f3 s3 g2)
+@slb == (m r3 f3 s2 g2)/(n r3 f3 s2 g2)
+@bb  == (y r3 f3 s3 g2) - @slb*(z r3 f3 s3 g2)
+@zf  == (@bb - @ba)/(@sla - @slb)
+@yf  == @sla*@zf + @ba
+@slc == (m r3 f2 s1 g2)/(n r3 f2 s1 g2)
+@bc  == (y r3 f2 s2 g2) - @slc*(z r3 f2 s2 g2)
+@fcl == @slc*@zf + @bc - @yf
+@fcl > 4
+
+! Clearance between tertiary mirror and rays between mirrors 1 and 2
+@sl6 == (m r3 f1 s2 g2)/(n r3 f1 s2 g2)
+@b6  == (y r3 f1 s3 g2) - @sl6*(z r3 f1 s3 g2)
+@cl3 == @sl6*(z r2 f1 s4 g2) + @b6 - (y r2 f1 s4 g2)
+@cl3 = 5
+
+! Central ray through center of image surface (on-axis is F2)
+y si r1 f2 = 0
+
+go

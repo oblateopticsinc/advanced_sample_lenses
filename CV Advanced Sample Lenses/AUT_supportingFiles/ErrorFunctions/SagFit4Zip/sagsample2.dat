@@ -1,0 +1,8 @@
+Trial sag data
+X Y Z form (3 columns)
+You can have as many comment lines as you like at
+the top of the file, as long as a line can't be
+interpreted as a number.
+0	1	.02
+.1	2	.08
+.5	3	.15

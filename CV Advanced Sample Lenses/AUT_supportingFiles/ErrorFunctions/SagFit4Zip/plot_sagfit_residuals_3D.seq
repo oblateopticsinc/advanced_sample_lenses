@@ -1,0 +1,188 @@
+!	Macro for plotting sag fit residuals.
+!	For use after SAGFIT2 is run.
+!	Utilizes global macro variables created by SAGFIT2.
+!	Assumes ^NUMPTS of X,Y,Z data is in buffer B^sagbuf.
+!	Fitted surface is surface 2.
+!	Also prints X,Y and Y-only decentered rectangular and circular apertures.
+!
+!	Assumes original data is on an equally spaced grid,
+!	though some grid points may have no data.
+!	UGR and UCH can handle missing data in SFP.  (NDA = 9999)
+!	Puts fit error into buffer B^resbuf.
+!	^resbuf is a global variable.
+!
+!	Also puts X & Y on surface 2 in buffer B^foobuf.
+!	This is for determining aperture on fitted surface (a la FOOtprint),
+!	since the fitted surface may be decentered and tilted.
+!
+GBL num ^sagbuf ^NUMPTS ^resbuf ^foobuf
+LCL num ^rmsfiterror ^i ^x ^y ^dx ^dy ^xmin ^xmax ^ymin ^ymax
+LCL num ^coloffset ^rowoffset ^bad ^diff ^row ^col ^j ^nda
+LCL str ^title ^cht ^cirlabel
+rfd 0 0 "" ""
+^dx == #1
+^dy == #2
+^nda == 9999
+!
+!	Find min & max X & Y in the data
+!
+^xmin == 1e22 ; ^xmax == -1e22
+^ymin == 1e22 ; ^ymax == -1e22
+for ^i 1 ^NUMPTS
+	^x == (buf.num b^sagbuf i^i j1)
+	^xmin == minf(^xmin,^x)
+	^xmax == maxf(^xmax,^x)
+	^y == (buf.num b^sagbuf i^i j2)
+	^ymin == minf(^ymin,^y)
+	^ymax == maxf(^ymax,^y)
+end for
+!
+!	Use DX and DY to find min column & min row offsets
+!
+^coloffset == roundf(^xmin/^dx)-1
+^rowoffset == roundf(^ymax/^dy)+1
+!
+!	Find an empty buffer after ^SAGBUF in
+!	which to stash sag differences.
+!
+for ^resbuf ^sagbuf 999
+	if (buf.emp b^resbuf)
+		goto got_buffer
+	end if
+end for
+wri "Can't find an empty buffer!  Macro aborting."
+RTN
+LBL got_buffer
+!
+!	Find an empty buffer after ^RESBUF in
+!	which to stash S2 footprint coordinates.
+!
+for ^foobuf ^resbuf+1 999
+	if (buf.emp b^resbuf)
+		goto got_foobuf
+	end if
+end for
+wri "Can't find an empty buffer!  Macro aborting."
+RTN
+LBL got_foobuf
+!
+!	Calculate differences & put in that buffer ^RESBUF.
+!	Also compute RMS fit error for display.
+!	Also put FOO coordinates in buffer ^FOOBUF.
+!
+^rmsfiterror == 0
+wri q"Computing 'd' fit errors and putting into buffer B'd'" ^numpts ^resbuf
+out n
+for ^i 1 ^NUMPTS
+	^x == (buf.num b^sagbuf i^i j1)
+	^y == (buf.num b^sagbuf i^i j2)
+	^bad == RAYSIN(1,1,^x,^y,0,0)
+	if not ^bad
+		^diff == (op s1..2)-(buf.num b^sagbuf i^i j3)
+		^row == ^rowoffset-roundf(^y/^dy)
+		^col == roundf(^x/^dy)-^coloffset
+!		buf put b^resbuf i^i ^row ^col ^x ^y ^diff  ! was merely for checking row & col calc.
+		buf put b^resbuf i^row j^col ^diff
+		buf put b^foobuf iL+1 (x s2) (y s2)
+		^rmsfiterror == ^rmsfiterror + ^diff**2
+	end if
+end for
+!
+!	Put NDA value in all empty cells of buffer
+!
+^col == (buf.mxj b^resbuf)
+for ^i 1 (buf.LST b^resbuf)
+	for ^j 1 ^col
+		if (buf.typ b^resbuf i^i j^j)<>"NUM"
+			buf put b^resbuf i^i j^j ^nda
+		end if
+	end for
+end for
+out y
+wri q"Fit minus actual data sag residuals are in buffer B'd'" ^resbuf
+!
+!	Plot the differences with UCH.
+!
+UCH
+NDA ^nda
+xla 'X on surface'
+yla 'Y on surface'
+zla 'Sag difference (fitted-actual)'
+^title == rfstr(3)
+if ^title="" ! If no title is already supplied by user as argument 3.
+	^title == concat('Sag fit residuals for data in B',num_to_str(^sagbuf))
+	^title == concat(^title,' fit to ')
+	^title == concat(^title,(typ sur s2))
+end if
+title ^title
+sfp b^resbuf ia j1..3
+gox (^xmin+^xmax)/2
+goy (^ymin+^ymax)/2
+gri ^dx ^dy
+^cht == rfstr(4)
+if ^cht<>""  !  If user supplies template name as argument 4.
+	CHT ^cht
+end if
+go
+!
+!	Find the min & max X & Y coordinates on S2.
+!	Then compute corresponding rectangular aperture,
+!	And finally, circular aperture co-centered with rectangle.
+!
+!	Case 1:  Apertures are decentered in X & Y.
+!
+^xmin == 1e22 ; ^xmax == -1e22
+^ymin == 1e22 ; ^ymax == -1e22
+for ^i 1 ^NUMPTS
+	^x == (buf.num b^foobuf i^i j1)
+	^xmin == minf(^xmin,^x)
+	^xmax == maxf(^xmax,^x)
+	^y == (buf.num b^foobuf i^i j2)
+	^ymin == minf(^ymin,^y)
+	^ymax == maxf(^ymax,^y)
+end for
+^adx == (^xmax+^xmin)/2
+^rex == (^xmax-^xmin)/2
+^ady == (^ymax+^ymin)/2
+^rey == (^ymax-^ymin)/2
+^rmax == 0
+for ^i 1 ^NUMPTS
+	^rsqd == ((buf.num b^foobuf i^i j1)-^adx)**2 + ((buf.num b^foobuf i^i j2)-^ady)**2
+	^rmax == maxf(^rmax,^rsqd)
+end for
+^cir == sqrtf(^rmax)
+wri
+wri "The following are X- and Y-decentered rectangular and circular apertures on S2."
+wri "These commands can be cut and pasted into the Code V Command Window."
+wri "Change the surface number ^s as appropriate."
+wri "^s == 2"
+wri q"rex s^s edg 'd.4d' ; rey s^s edg 'd.4d' ; adx s^s edg 'd.4d' ; ady s^s edg 'd.4d'" &
+	^rex ^rey ^adx ^ady
+^cirlabel == "'cir'"
+wri q"cir s^s edg L'5c' 'd.4d' ; adx s^s edg L'5c' 'd.4d' ; ady s^s edg L'5c' 'd.4d'" &
+	^cirlabel ^cir ^cirlabel ^adx ^cirlabel ^ady
+wri
+!
+!	Case 2:  Apertures are decentered in Y only.
+!
+^adx == 0
+^rex == maxf(absf(^xmin),absf(^xmax))
+^rmax == 0
+for ^i 1 ^NUMPTS
+	^rsqd == (buf.num b^foobuf i^i j1)**2 + ((buf.num b^foobuf i^i j2)-^ady)**2
+	^rmax == maxf(^rmax,^rsqd)
+end for
+^cir == sqrtf(^rmax)
+
+wri "The following are Y-decentered rectangular and circular apertures on S2."
+wri "^s == 2"
+wri q"rex s^s edg 'd.4d' ; rey s^s edg 'd.4d' ; ady s^s edg 'd.4d'" ^rex ^rey ^ady
+wri q"cir s^s edg L'5c' 'd.4d' ; ady s^s edg L'5c' 'd.4d'" ^cirlabel ^cir ^cirlabel ^ady
+!
+!	Print the RMS fit error.
+!
+wri
+^rmsfiterror == sqrtf(^rmsfiterror/^NUMPTS)
+wri "RMS fit error =" ^rmsfiterror
+wri "You can also calculate the RMS fit error with"
+wri "EVA sqrtf((AUT.ERF)/^NUMPTS)"

@@ -1,0 +1,258 @@
+!	Macro to fit sag data with AUT.
+!
+!	Usage:
+!		1. Save your lens.  This macro creates a dummy lens.
+!		2. Run this macro, providing the file name for the sag
+!			data, and the surface type to fit to the data.
+!			Type the command
+!				IN SAGFIT6 sag_data_filename [surface_type [UDS_DLL_name]]
+!			(Brackets denote optional arguments.)
+!			Default surface type is ASP.
+!			UDS_DLL_name is only used if surface type is UDS. 
+!			If sag_data_filename is an integer, macro assumes data is in that buffer,
+!			and does not try to read a file.
+!		3. Make the desired coefficients variable on surface S2.
+!			Change the surface to the desired type if you forgot
+!			to do this in step 2.
+!			The surface has a regular ("basic") decenter on it, so you can
+!			vary the decenter and/or tilt if that is appropriate
+!			for your sag data.
+!		4. Run the actual AUT macro, which is created by
+!			this macro and is always called SAGFITAUT.SEQ.
+!			To run it, type the command
+!				IN SAGFITAUT 
+!		5. If the fit is unsatisfactory, change control codes
+!			to vary more parameters as needed, and repeat
+!			step 4.
+!		6. You can edit SAGFITAUT.SEQ if desired.
+!			
+!	This macro obliterates the current lens and replaces it
+!	with a simple 2-surface setup.  By default, the surface
+!	to be fit is an ASP.
+!
+!	The macro creates a sequence file called SAGFITAUT.SEQ,
+!	  which utilizes the sag data (stashed in a buffer) in an
+!	  AUT user-defined error function.
+!	
+!	Input required:
+!	  Text file with tab-delimited y z or x y z sag data,
+!	  one y z or x y z data point per line.  Text header lines are OK.
+!
+!	Argument #1 = name of sag data file (.dat default extension)
+!	  If the file has 2 columns, they are assumed to be y and z.
+!	  If the file has 3 columns, they are assumed to be x, y, and z.
+!	  The file is read into Code V with the BUF IMP command
+!	  Any lines at the top of the file with non-numeric data will
+!		be assumed to be comment lines.
+!
+!	Argument #2 = Surface type to be fitted (e.g. ASP, YTO, AAS, 'SPS XYP')
+!	  Enclose in quotes if two words are required, e.g., 'SPS ZRN'
+!	  Default is ASP.
+!
+!	Argument #3 = DLL file name, to be used only if surface type is UDS.
+!	  Default is USERSUR.
+!
+!	History:
+!		12-Feb-99	JFI	Original version			
+!		15-Jan-02	JFI	Simplified
+!		28-Sep-06	JFI	Added EXT to AUT input
+!		28-Sep-06	JFI	Specified ABL ALL 1 only if 10 data points or less
+!		13-Oct-09	JFI	Added symmetry warning, GUI dialog box, UDS DLL name; Added MXC 50.
+!		 6-May-14	JFI	If filename is an integer, fetch sag dat from that buffer, not from a file.
+!		 7-Aug-14	JFI	Creare SAGFITAUT.SEQ in a worksheet buffer instead of WRIting lines into a file.
+!
+!****************************************************************************
+! ARG0 "Macro to fit surface sag data to any Code V surface type."
+! ARG0 "This macro creates another macro (SAGFITAUT.SEQ), which you must "
+! ARG0 "run to perform the actual fit.  Employs user-defined error function."
+!
+! ARG1 NAME     "Sag data file name, or buffer number"
+! ARG1 TYPE     STR
+! ARG1 DEFAULT  ""
+! ARG1 HELP     "Tab-delimited text file with sag data in 2 or 3 columns; .DAT default ext."
+!
+! ARG2 NAME     "Type of surface to fit"
+! ARG2 TYPE     STR
+! ARG2 CHOICE   "SPH" "CYL" "CON" "ASP" "YTO" "XTO" "AAS" "SPS ODD" "SPS ZRN" "SPS XYP" "SPS SCN" "UDS"
+! ARG2 DEFAULT  "ASP"
+! ARG2 HELP     "Surface type to fit.  Can be changed later.  Default=ASP"
+!
+! ARG3 NAME     "If UDS, name of .DLL file"
+! ARG3 TYPE     STR
+! ARG3 DEFAULT  "usersur"
+! ARG3 HELP     "If UDS, name of .DLL file.  Default=usersur"
+!
+rfd nofilename ASP usersur
+GBL num ^sagbuf ^numpts ^firstline ^numcols
+GBL str ^filename ^surftype ^uds_DLL_name
+LCL num ^fb
+LCL str ^command
+^filename == rfstr(1)
+^surftype == rfstr(2)
+^surftype == upcase(^surftype)
+^uds_DLL_name == rfstr(3)
+wri ^filename ^surftype ^uds_DLL_name
+
+if ^filename = 'nofilename' or ^filename = ""
+	wri
+	wri "Syntax:  in sagfit6 file_name [surf_type [UDS_DLL_name]]"
+	wri
+	wri 'file_name = Name of text file containing sag data.  Default extension = .dat'
+	wri '            One [y z] or [x y z] data point per line, tab-delimited.'
+	wri '            If you enter a number (integer), macro assumes sag data is in that buffer.'
+	wri '            Header lines beginning with a non-numeric character are OK.'
+	wri
+	wri "surf_type = Type of surface to fit, e.g., ASP, YTO, AAS, or 'SPS XYP'"
+	wri '            Enclose in quotes if two words.'
+	wri
+	wri "UDS_DLL_name = Name of DLL file to utilize if surf_type is UDS."
+	wri
+	wri 'This macro obliterates the current lens and replaces it'
+	wri 'with a simple 2-surface setup.  It also creates a macro'
+	wri 'file called SAGFITAUT.SEQ which accomplishes the actual'
+	wri 'fitting optimization.  After this macro finishes, you must'
+	wri '1. Change control codes so that the desired surface parameters'
+	wri '   are variable (e.g., BC S2 0).  Note that the surface has a'
+	wri '   "basic" decenter on it, so that the decenters and/or tilts'
+	wri '   can be varied if desired.'
+	wri '2. Run the fitting macro by typing IN SAGFITAUT'
+	wri '3. If the fit is not satifactory, you can repeat steps 1 & 2'
+	wri '   as needed.  In step 1, you may add more variables.'
+	rtn
+end if
+lens
+rdm n
+wl 500;epd 2;dim m;yob 0
+so 0 1e11
+s 0 0;sto
+s 1e-7 10;ccy 1;xde 0
+si 0 0
+!
+!	See if the filename is in fact a number.
+!	If it is, that's the buffer number containing the sag data.
+!	Otherwise, assume it's a file name and import the sag data from file into a buffer.
+!
+^sagbuf == str_to_num(^filename)
+if num_to_str(^sagbuf)<>^filename
+	! Find an unused buffer ^sagbuf
+	^sagbuf == 1
+	whi not (buf.emp b^sagbuf)
+		^sagbuf == ^sagbuf + 1
+	end whi
+	buf imp b^sagbuf $filename
+end if
+!
+!	Strip off header lines, if any.
+!	Any line or lines at the beginning of the file with
+!	(buf.typ j1)<>"NUM" is considered a header line.  Data
+!	is assumed to begin at first line for which (buf.typ j1)="NUM".
+!
+wri
+wri q"Data imported into buffer number 'd'." ^sagbuf
+while (buf.typ b^sagbuf i1 j1) <> "NUM"
+	wri "Header line ignored: " (buf.txt b^sagbuf i1)
+	buf del b^sagbuf i1
+end whi
+^numpts == (buf.LST b^sagbuf)
+wri q"'d' data points." ^numpts
+!
+!	Check to see if all rows have two or three columns.
+!
+^numcols == (buf.mxj b^sagbuf)
+if ^numcols = 2
+	wri 'The 2 columns of data are assumed to be y and z.'
+	wri
+	wri 'N.B.: Fit only a rotationally symmetric surface'
+	wri 'shape (or Y cylinder) to this data.  If an asymmetric'
+	wri 'surface type such as AAS, SPS XYP, or SPS ZRN is used,'
+	wri 'do not vary any coefficients that have X dependence,'
+	wri 'as their values are indeterminate.'
+	wri
+else if ^numcols = 3
+	wri 'The 3 columns of data are assumed to be x, y, and z.'
+	wri
+else
+	wri q"ERROR: Data imported with 'd' columns instead of 2 or 3 columns." (buf.mxj b^sagbuf)
+	wri 'Check and repair data file' upcase(^filename) 'and re-run this macro.'
+	wri 'Data file must have two values per line (y z)'
+	wri 'or three values per line (x y z) and be tab-delimited.'
+	wri 'Header line(s) beginning with a non-numeric character are OK.'
+	wri 'Data is assumed to begin at first line for which (buf.typ j1)="NUM".'
+	wri
+	rtn
+end if
+!
+!	Implement desired surface type.
+!
+^command == concat(^surftype,' S2')
+$command
+wri ^surftype
+if ^surftype="UDS"
+	^command == concat('umr s2 uds ',^uds_DLL_name)
+	$command
+end if
+!
+!	Create the AUT macro with UDEF in the file sagfitaut.seq
+!	Create in a buffer B^fb first, then export.
+!
+^fb == 1000
+whi not (buf.emp b^fb)
+	^fb == ^fb + 1
+end whi
+!ope u^u1 new sagfitaut.seq
+buf put b^fb iL+1 'aut'
+buf put b^fb iL+1 'err usr'
+buf put b^fb iL+1 '! Show the first ENT and ABR.  Hide the rest with OUT N.'
+if ^numcols = 2
+	buf put b^fb iL+1 '	ent 0.0 (buf.num b^sagbuf i1 j1)'
+	buf put b^fb iL+1 '	abr f1 e1 s2 LEN 1  (buf.num b^sagbuf i1 j2)'
+else if ^numcols = 3
+	buf put b^fb iL+1 '	ent (buf.num b^sagbuf i1 j1) (buf.num b^sagbuf i1 j2)'
+	buf put b^fb iL+1 '	abr f1 e1 s2 LEN 1  (buf.num b^sagbuf i1 j3)'
+end if
+buf put b^fb iL+1 'ABL ALL'
+buf put b^fb iL+1 'out n'
+buf put b^fb iL+1 'for ^e 2 ^numpts'
+if ^numcols = 2
+	buf put b^fb iL+1 '	ent 0.0 (buf.num b^sagbuf i^e j1)'
+	buf put b^fb iL+1 '	abr f1 e^e s2 LEN 1  (buf.num b^sagbuf i^e j2)'
+else if ^numcols = 3
+	buf put b^fb iL+1 '	ent (buf.num b^sagbuf i^e j1) (buf.num b^sagbuf i^e j2)'
+	buf put b^fb iL+1 '	abr f1 e^e s2 LEN 1  (buf.num b^sagbuf i^e j3)'
+end if
+buf put b^fb iL+1 'end for'
+buf put b^fb iL+1 'out y'
+buf put b^fb iL+1 '! Display only the first 10 ABRs each cycle.'
+if ^numpts <= 10
+	buf put b^fb iL+1 'ABL ALL 1'
+else
+	buf put b^fb iL+1 'ABL a1..10 ALL 1'
+end if
+buf put b^fb iL+1 'ext ! Extended optimization usually helpful'
+buf put b^fb iL+1 'imp .001'
+buf put b^fb iL+1 'mxc 50'
+buf put b^fb iL+1 'sur s2'
+buf put b^fb iL+1 'go'
+buf put b^fb iL+1 'wri'
+buf put b^fb iL+1 'wri "RMS fit error =" sqrtf((aut.erf)/^numpts)'
+if ^numcols = 2
+  buf put b^fb iL+1 'wri "You can plot the sag fit residuals with the PLOT_SAGFIT_RESIDUALS macro."'
+end if
+buf exp b^fb sagfitaut.seq
+!
+wri
+wri q"Your sag data is now in buffer B'd'." ^sagbuf
+wri
+wri 'Change the control codes to zero for the parameters you wish'
+wri 'to vary on surface S2 (or even change the surface type).' 
+wri '(Exception:  Type CCY S2 1 instead of CCY S2 0 to vary the curvature [CUY])'
+wri 'Then run the fitting optimization with the command'
+wri 'IN SAGFITAUT'
+wri 'You are encouraged to edit SAGFITAUT.SEQ to allow (for example)'
+wri 'more optimization cycles (MXC), etc.'
+wri
+!	List the surface data for user check.
+!
+wri "Current fitting surface:"
+sur s2 f
+rtn

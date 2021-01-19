@@ -1,0 +1,48 @@
+!	Macro for plotting sag fit residuals.
+!	For use after SAGFITn macro is run.
+!	Utilizes global macro variables created by SAGFITn.
+!	Assumes ^NUMPTS of Y,Z data is in buffer B^sagbuf.
+!	Fitted surface is surface 2.  Only works if S2 isn't tilted.
+!
+!
+!	First, find an empty buffer after ^SAGBUF in
+!	which to stash sag differences.
+!
+for ^resbuf ^sagbuf 999
+	if (buf.emp b^resbuf)
+		goto got_buffer
+	end if
+end for
+LBL got_buffer
+!
+!	Now, calculate differences & put into that buffer.
+!	Also compute RMS fit error for display.
+!
+^rmsfiterror == 0
+for ^i 1 ^NUMPTS
+	^y == (buf.num b^sagbuf i^i j1)
+	^diff == (zde s2)+sagf(2,1,0,^y)-(buf.num b^sagbuf i^i j2)
+	buf put b^resbuf i^i ^y ^diff
+	^rmsfiterror == ^rmsfiterror + ^diff**2
+end for
+!
+!	Finally, plot the differences with UGR.
+!
+ugr;xla 'Y';yla 'Sag difference (fitted-actual)'
+^title == concat('Sag fit residuals for data in   ',^filename)
+^title == concat(^title,' fit to ')
+^title == concat(^title,(typ sur s2))
+title ^title
+dtb b^resbuf ia ja 'Sag difference'
+go
+!
+^rmsfiterror == sqrtf(^rmsfiterror/^NUMPTS)
+wri "RMS fit error =" ^rmsfiterror
+if (zde s2)
+	wri "Includes constant offset (ZDE S2) of" (zde s2)
+end if
+if (ade s2) or (bde s2)
+	wri "Does not include ADE or BDE tilt."
+end if
+wri "You can also calculate the RMS fit error with"
+wri "EVA sqrtf((AUT.ERF)/^NUMPTS)"

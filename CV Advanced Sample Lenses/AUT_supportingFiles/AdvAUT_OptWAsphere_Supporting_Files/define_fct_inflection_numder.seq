@@ -1,0 +1,55 @@
+!	Macro function to compute whether sign of sag's
+!	2nd derivative (d2z/dy2) always matches sign of vertex curvature.
+!	Works for any surface type.
+!	Return value = minimum[(d2z/dy2)/CUY] over the range 0 < y < ymax
+!	Need to keep it positive to avoid inflections.  Equals 1 at vertex.
+!	Possible enhancement:  Substitute osculating curvature for 2nd derivative
+!
+wri "Defining macro function @INFLECTION_NUMDER."
+wri "Computes minimum value (over the clear aperture) of this ratio:"
+wri "  [Radial 2nd derivative of surface S sag]/[vertex curvature of surface S]"
+wri "This ratio = 1 at vertex and goes < 0 if there's a radial inflection"
+wri "  Argument 1 = surface number S"
+wri "  Argument 2 = number of y sampling heights"
+wri "  Argument 3 = maximum y (Enter 0 to use MAP value)"
+wri "  Argument 4 = numerical derivative delta (as fraction of max y)"
+wri "NOTE:  If Argument 3 = 0, then it gets and uses the MAP on that surface."
+wri "       MAP (default clear aperture radius, or user-entered aperture, if one exists)"
+wri "       is dynamically updated if used in AUT."
+wri "N.B.:  Gives divide by 0 if CUY = 0."
+wri "       Works for any surface type."
+wri "       Zoom position 1 only."
+
+FCT @inflection_numder(num ^s, num ^npts, num ^ymax, num ^dyfrac)
+LCL num ^yinc ^dy ^y ^cuy ^func
+^s == roundf(^s)
+^npts == roundf(^npts)
+if ^ymax = 0
+	^ymax == (map s^s)
+end if
+^yinc == ^ymax/^npts
+^dy == ^ymax*^dyfrac
+!
+^typsur == (typ sur s^s)
+if ^typsur="SPH"
+	^func == 1
+	goto done
+else if substr(^typsur,1,3)="SPS"
+	^cuy == 2*(sagf(^s,1,0,^dy)-sagf(^s,1,0,0))/^dy/^dy
+else
+	^cuy == (cuy s^s)
+end if
+!
+if ^cuy=0
+	^func == 1
+else
+	^func == 1e22
+	for ^i 1 ^npts
+		^y == ^i*^yinc
+		^d2zdy2 == ( sagf(^s,1,0,^y-^dy) - 2*sagf(^s,1,0,^y) + sagf(^s,1,0,^y+^dy) )/^dy/^dy
+		^func == minf(^func,^d2zdy2/^cuy)
+	end for
+end if
+LBL done
+end fct ^func
+LVR FCT

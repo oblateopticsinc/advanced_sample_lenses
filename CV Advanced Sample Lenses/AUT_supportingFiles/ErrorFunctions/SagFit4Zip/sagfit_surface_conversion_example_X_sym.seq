@@ -1,0 +1,80 @@
+!	Example of converting SPS ZFR to SPS XYP with SAGFIT5 macro
+!	This example uses terms up to 8th order and is bilaterally symmetric.
+!	(Even powers of X only.)
+!
+!	Start with sample lens SINGLET
+res cv_lens:singlet
+!
+!	Convert S1 to SPS ZFR; default normalization radius = SD
+!	Use random numbers for coefs from ZP1 to ZP26 (UCO C4 to C29)
+sps s1 zfr
+^s == 1
+^mag == .2
+!
+!	The logic below selects only terms in ZFR surface that are even in X,
+!	i.e., bilaterally symmetric, SAG(x,y) = SAG(-x,y)
+!
+^isqold == 0
+for ^i 1 5
+	^j == ^i*^i
+	^k == 1
+	whi ^j > ^isqold
+		^c == ^j+3
+		sco s^s c^c ^mag*(randf-.5)
+		^j == ^j - ^k
+		^k == 4 - ^k
+	end whi
+	^isqold == ^i*^i
+end for
+sur sa f
+!
+!	Clear out buffers to use for sag data.
+!	SAGTABLE_2D macro chooses its own buffers, so first make sure B1, B2, B3 are empty.
+!
+buf?
+buf del b1..3
+!
+!	Run 2D sag table macro.  It uses first available buffers,
+!	so proper sag table will be in B2.  Default grid is 21x21 points over clear aperture.
+!	"1" argument is the surface number
+!	"C" argument means sample over a semi-circular area (X > 0 only), default radius = SD
+in sagtable_2D 1 C 
+!
+!	Now run SAGFIT5; the argument "2" is the buffer number with the sag data
+in sagfit5 2 "SPS XYP"
+!
+!	Set normalization radius and vary the terms up to 8th power
+sco s2 nradius 10
+sur s2
+!
+!	First vary only the curvature and Z offset (ZDE).
+!	Varying the ZDE allows for piston, which SPS ZFR has, but SPS XYP doesn't!
+!	(SAGFIT5 varies the curvature automatically...)
+zdc s2 0
+!
+!	Run the SAGFITAUT macro to do the first fit.
+in sagfitaut
+!
+!	Now vary the XYP coefficients as well.
+^s == 2
+!
+!	The logic below varies only the terms in SPS XYP surface that are even in X,
+!	i.e., bilaterally symmetric, SAG(x,y) = SAG(-x,y)
+!
+^j == 1
+for ^i 1 8
+	^c == (^i+1)*(^i+2)/2
+	whi ^c > ^j
+		scc s^s c^c 0
+		!wri ^i ^c
+		^c == ^c - 2
+	end whi
+	^j == (^i+1)*(^i+2)/2
+end for
+sur sa f
+!
+!	Run the SAGFITAUT macro again.
+in sagfitaut
+!
+!	Should be getting very low RMS fitting error,
+!	as these surface types allow an exact fit.

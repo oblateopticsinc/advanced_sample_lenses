@@ -1,0 +1,40 @@
+RDM
+LENS NEW
+EPD 1
+DIM M
+WL 760
+S1 50 2.5 BK7
+S 0 0
+PIM
+GO
+PIM N
+tit "Multiple Clipping Apertures"
+INS S1
+THI S1 100
+REX S1 .5;REY S1 .5;ADY S1 -.3
+PUI .135
+STO S2;CIR S2 .5
+WND OPE 10
+WND PLO P1..6
+
+PMA
+TGR 128
+PIN
+Cht all y
+GO
+
+PSF
+TGR 128
+INT DB
+cht int y
+GO
+
+THI S0 .001
+
+BSP
+WRY 0.5
+PRA RUN
+INT SI DB
+cht INT S2
+cht INT SI
+GO

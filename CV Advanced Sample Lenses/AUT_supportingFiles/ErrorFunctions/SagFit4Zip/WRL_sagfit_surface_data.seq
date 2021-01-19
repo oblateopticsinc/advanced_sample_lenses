@@ -1,0 +1,78 @@
+!	Macro to export surface data after a SAGFITx run
+!	so it can be imported onto a surface of another optical system.
+!
+!	Current lens system must still be the SAGFIT 2-surface "optical system"
+!	with the fitted surface on S2.
+!
+rfd ""
+LCL num ^b ^i
+GBL str ^surfexpfile
+LCL str ^time
+!
+!	Check to see if system is one that SAGFIT macro created.
+!	Checks are fairly simple and not foolproof!
+!
+if (num s)<>3 or (WL w1)<>500 or (STO)<>1
+	wri
+	wri "Current system isn't one that SAGFIT macro would have created."
+	wri
+	RTN
+end if
+!
+!	Get user-supplied filename, if any.
+!	Generate a unique name if none supplied.
+!
+^surfexpfile == rfstr(1)
+if ^surfexpfile = ""
+	^surfexpfile == concat("fitted_surface_",(date))
+	^time == (tim)
+	^surfexpfile == concat(^surfexpfile,"_")
+	^surfexpfile == concat(^surfexpfile,substr(^time,1,2))
+	^surfexpfile == concat(^surfexpfile,substr(^time,4,2))
+	^surfexpfile == concat(^surfexpfile,substr(^time,7,2))
+	^surfexpfile == concat(^surfexpfile,".seq")
+end if
+!
+!	Save the 2-surface setup as a .SEQ file
+!
+WRL ^surfexpfile
+!	Find empty buffer
+^b == 1
+whi not (buf.emp b^b)
+	^b == ^b + 1
+end whi
+!
+!	Import the .SEQ file into a buffer
+!
+buf imp b^b ^surfexpfile
+!
+!	Strip off all the lines that don't create the correct surface type and shape
+!
+buf mov b^b iL
+buf fnd rev "<SI   "
+buf del b^b ic..L
+buf mov b^b iL
+buf fnd rev "  STO$"
+buf del b^b i1..c+1
+buf mov b^b i1
+buf fnd b^b "CCY"
+if (buf.fnd)
+	buf del b^b ic
+end if
+buf ins b^b i1 
+buf put b^b i1 "  CUY" (cuy s2)
+buf lis b^b
+!
+!	Export the buffer to a file.
+!
+buf sep " "
+buf exp b^b sep ^surfexpfile
+wri
+wri q"Commands to create fitted surface are in file '60c'" ^surfexpfile
+wri q"Commands to create fitted surface are also in buffer B'd'." ^b
+wri
+wri "These are the commands:"
+for ^i 1 (buf.LST b^b)
+	wri (buf.txt b^b i^i)
+end for
+

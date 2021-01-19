@@ -1,0 +1,654 @@
+!*********************************************************************************************
+! Sequence:     PlotDFS.seq
+!
+! Purpose:      Macro to plot the departure from sphere (DFS) for a surface.
+!
+! Syntax:       in plotDFS surface [max_ape] [BSP|BCN|BFS] [nrd]
+!                           req'd      0        BSP         100
+! 
+!               surface      - asphere surface #
+!               max_ape      - max radius to plot the departure
+!               BSP|BCN|BFS  - choice of ref. surface (base sphere, base conic, best fit sphere) 
+! 
+! Notes:        The desired asphere is put in a new system where the reference sphere (base or BFS) is S1,
+!               and the asphere is S2. Rays are traced from infinity, and the length
+!               of the ray between S1 and S2 is the DFS along the z-axis. This is verified by checking that
+!               the sagf() difference yields the same value. 
+!               The object distance is then set = to the center of curvature of the reference sphere, and rays 
+!               are traced to get the DFS along the normal to the base sphere.
+!               For a base conic as the reference surface, the local slope is calculated for each 
+!               y-coord, and the object distance is set to this center of curvature to get the
+!               DFS along the normal. 
+!               Sags are defined to be >0 for convex surfaces, and <0 for concave surfaces.
+!               A positive departure represents a bump relative to the reference surface. 
+!
+! Buffers Used: First empty buffer
+!
+! Dependencies: None
+!
+! Assumptions:  - Desired asphere surface is rotationally symmetric
+!               - Base sphere (NOT the best fit sphere) of the surface is = (PRY) value if it is QBF surface
+!               - Reference sphere (base or BFS) and asphere have the same vertex location
+!
+! Limitations:  - (MAP) value is used to determine radius of part. Decentered apertures are not accounted for.
+!
+! Dev notes:
+! - Set ^UtilityMode == 1 when converting this macro to writer utility
+!
+! Author:       J. Wilson  7/1/10
+! Modified:     10/19/11
+! Version:      10.4.0.9
+!
+! History:      07/01/10    New
+!               10/07/10    Added threshold on ^departure to remove noise from plots. 
+!               10/10/10    Added check for a base sphere with ROC < the beam footprint
+!               05/19/11    Changed ^max_ape to use only 9 digits of precision to prevent tracing a ray beyond MAP
+!               09/29/11    Added column for waves of departure and a plot of fringes of departure
+!               10/12/11    Added plot of principal curves (rad/tan)
+!                           Added units to listing
+!
+! To do:
+! - Add zoom input                           
+!
+!*********************************************************************************************
+! ARG0 "Plots surface departure from a reference sphere or conic. "
+!
+! ARG1 NAME     "Desired surface"
+! ARG1 TYPE     num
+! ARG1 DEFAULT  1
+! ARG1 HELP     "Surface to plot departure."
+!
+! ARG2 NAME     "Max aperture"
+! ARG2 TYPE     num
+! ARG2 DEFAULT  0
+! ARG2 HELP     "Max aperture to plot departure (0 = MAP)."
+!
+! ARG3 NAME     "Reference surface"
+! ARG3 TYPE     STR
+! ARG3 CHOICE   "BSP" "BCN" "BFS"
+! ARG3 DEFAULT  "BFS"
+! ARG3 HELP     "BSP - Base sphere, BCN - Base conic, BFS - Best fit sphere"
+!
+! ARG4 NAME     "Number of profile points"
+! ARG4 TYPE     num
+! ARG4 DEFAULT  50
+! ARG4 HELP     "Desired number of points along the surface profile from vertex to edge."
+!*********************************************************************************************
+
+lcl num ^sasfOut(3)
+
+
+rfd 0 0 BFS 50 0 0
+
+str ^rfs  ! base ref. surface flag (BSP|BCN|BFS)
+num ^output
+
+
+out n
+ver n
+! out y
+! ver all y
+
+
+if #1 = 0
+    out y
+    wri " syntax: in plotDFS surface [max_ape] [BSP|BCN|BFS] [nrd]"
+    ver y
+    rtn
+end if
+
+
+! Save original lens to restore later
+^fname == (fil)
+sav temp_plot_dfs
+
+
+! Initialize variables
+^s == #1                      ! asphere surface to plot
+^max_ape == #2                ! plot DFS out to this radius
+^rfs == upcase(rfstr(3))      ! flag to plot base sphere, base conic, or best fit sphere
+^num_pts == #4                ! # pts. to plot
+^pos == #5                    ! Undocumented input used by writer utility indicating the first or second surface of an element
+^dfsAxisMax == #6             ! Undocumented input to control plot scale
+^UtilityMode == 0             ! DEV note: flag set to 1 if converting this macro to writer utility
+^DepartureNoise == 1e-11      ! Limit where there seems to be roundoff error when calculating departure
+^pi == atanf(1)*4
+^z == 1                       ! Assume z1 for now
+
+
+
+if ^max_ape = 0; 
+   ! Set equal to MAP by default, but only use 10 digit precision
+   ^max_ape == (map s^s)
+   ^max_ape == ^max_ape * 1e10
+   ^max_ape == ^max_ape - modf(^max_ape, 1)
+   ^max_ape == ^max_ape * 1e-10
+end if
+if ^max_ape = 0
+  wri "Error - max aperture = 0 detected for surface" num_to_str(^s) ". Aborting sequence."
+  goto QUIT
+end if
+
+
+
+! Set units label for plots
+^dim == (dim)
+^unitsStr == "(mm)"
+^InvUnitsStr == "(1/mm)"
+^dimFactor == 1
+if ^dim = "C"
+  ^unitsStr == "(cm)"
+^InvUnitsStr == "(1/cm)"
+  ^dimFactor == 10
+else if ^dim = "I"
+  ^unitsStr == "(inches)"
+^InvUnitsStr == "(1/inches)"
+  ^dimFactor == 25.4
+end if
+  
+
+! Determine 1st or 2nd surface based on index change
+! Typically this is not user entered, but is an undocumented input to be used by the converter utility 
+! since it already knows the first and second surface. 
+if ^pos = 0
+  if absf((ind s^s)) >= absf((ind s^s-1))
+    ^pos == 1   ! first surface
+  else
+    ^pos == 2
+  end if 
+end if
+
+
+
+
+! best-fit sphere
+if absf(sagf(^s,1,0,^max_ape)) < 1e-12
+  ! Prevents math error as sag approaches zero
+  ^RadBfs == 1e18
+else
+  ^RadBfs == (sagf(^s,1,0,^max_ape)**2 + ^max_ape**2)/(2*sagf(^s,1,0,^max_ape))
+end if
+
+
+! Determine RDY of input surface to use later
+! Must use the (PRY) db item for QBF surfaces, but also must hide this in quotes to avoid syntax errors with CV versions < 10.3
+^rdy_s == 0
+if (typ sur s^s) = "SPS QBF"
+  ^cmd == "^rdy_s == (pry s^s)"
+else
+  ^cmd == "^rdy_s == (rdy s^s)"
+end if
+$cmd
+
+
+
+! If base sphere is the reference, limit rays within the defined ROC
+if ^rfs = "BSP"  AND  ^max_ape > absf(^rdy_s)
+  ^max_ape == absf(^rdy_s)*(0.95)   ! Found cases of ray errors if you use 99-100% of ROC, so using 95% as safety margin
+  out y
+  ^result == cvwarning(concat(concat("Beam footprint on surface ", num_to_str(^s)), " extends beyond the curvature"), 0)
+  ^result == cvwarning("of the base sphere. Departure is only calculated within", 1)
+   ^result == cvwarning("region limited by base sphere radius.", 1)
+   out n
+end if
+
+
+
+
+! find empty buffer
+^b1 == 1; while NOT(buf.emp b^b1); ^b1 == ^b1 + 1; end while
+^bFringes == ^b1 + 1; while NOT(buf.emp b^bFringes); ^bFringes == ^bFringes + 1; end while
+^bCuy == ^bFringes + 1; while NOT(buf.emp b^bCuy); ^bCuy == ^bCuy + 1; end while
+
+
+
+
+!------------------------------------------------------------------
+! Determine current sign of curvature, and if surface is convex or concave
+! used to correct sag drawings later
+!------------------------------------------------------------------
+
+! Determine convexity based on curvature sign, z-space sign, and 1st/2nd surface
+if (((rdy s^s)*(ind s^s) > 0) AND (^pos = 1)) OR (((rdy s^s)*(ind s^s) < 0) AND (^pos = 2))
+  ^IsConvex == 1
+else 
+  ^IsConvex == 0
+end if
+! Reverse conditions for mirrors
+if (rmd s^s) = "REFL"
+  ^IsConvex == NOT(^IsConvex)
+end if
+
+! Calc sign factor based on current curvature sign and convexity
+^signRdy == signf(1, ^rdy_s)
+if (^IsConvex AND (^signRdy > 0)) OR (NOT(^IsConvex) AND (^signRdy < 0))
+  ^SagSignFactor == 1
+else
+  ^SagSignFactor == -1
+end if
+!------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+!------------------------------------------------------------------
+! Setup new system, delete all surfaces but desired asphere
+! Set object at infinity
+! S1 is the base sphere
+! S2 is the asphere
+!------------------------------------------------------------------
+dez 1
+rdm y
+del dda sa
+del sol sa
+epd ^max_ape*2
+yan 0; xan 0
+gla s^s
+rmd s^s refr
+if ^s <> ((num s)-1); del s^s+1..i-1; end if
+if ^s <> 1; del s1..^s-1; end if
+ins s1
+s0 0 1e12
+if ^rfs = "BSP"
+  s1 ^rdy_s 0
+  ^RefSurfTxt == "Base Sphere"
+else if ^rfs = "BCN"
+  s1 ^rdy_s 0
+  if ((typ sur s2) = "CON") OR &
+     ((typ sur s2) = "ASP") OR &
+     ((typ sur s2) = "XTO") OR &
+     ((typ sur s2) = "YTO")      
+    con s1; k s1 (k s2)
+  else if (typ sur s2) = "SPS QCN" OR &
+          (typ sur s2) = "SPS ZRN" OR &
+          (typ sur s2) = "SPS ODD" OR &
+          (typ sur s2) = "SPS XYP"
+    con s1; k s1 (SCO s2 C1)
+  end if
+  ^RefSurfTxt == "Base Conic"
+else if ^rfs = "BFS"
+  s1 ^RadBfs 0
+  ^RefSurfTxt == "Best Fit Sphere"
+end if
+if (rdy s1) > 1e16; cuy s1 0; end if   ! So that sagf() returns 0 for small values
+
+
+
+
+!------------------------------------------------------------------
+! Loop to trace rays from infinity to the surface, from vertex of 
+! the asphere out to the edge.
+! Save ray coord. in a buffer for plotting
+! List ray coord.
+!------------------------------------------------------------------
+buf mov b^b1 i1 j1
+for ^y 0 ^max_ape*(1+1e-9) ^max_ape/^num_pts
+
+  sin 0 ^y 0 0
+  ^departure == -(op s1..2)
+  if (absf(^departure) < ^DepartureNoise); ^departure == 0; end if
+
+  ! Check to see if ray trace departure = sagf departure to verify dummy surface setup correctly
+  ^sagDiff == sagf(2,1,0,^y)-sagf(1,1,0,^y)
+  if (absf(^sagDiff) < ^DepartureNoise); ^sagDiff == 0; end if
+  if ((absf(^sagDiff) >= absf(^departure)*0.95) AND (absf(^sagDiff) <= absf(^departure)*1.05)) 
+    buf put b^b1 ic (y s1) (y s2) (sagf(1,1,0,^y)*^SagSignFactor) (sagf(2,1,0,^y)*^SagSignFactor) (^departure*^SagSignFactor);
+  else
+    ! Difference in calcs is > than 5%, so we list both values for debugging purposes
+    ! Plot data point -99999 to highlight error in plot
+    out y; wri q" Sag dif error -  '3d.5d'   '3d.5d'   '3d.16d' '3d.16d' " (y s1) (y s2) ^departure ^sagDiff; out n
+    buf put b^b1 ic sagf(1,1,0,^y) (y s1) sagf(2,1,0,^y) (y s2) -99999;
+  end if
+  buf mov ic+1 j1
+  
+end for
+
+
+
+!--------------------------------------------------------------------------
+! Set object at center of curvature of base sphere
+! Loop to trace rays normal to base sphere from the vertex of the asphere 
+! out to the edge
+! List ray coord. and save in a buffer for plotting
+!--------------------------------------------------------------------------
+s0 0 -(rdy s1)
+! rtn
+buf mov b^b1 i1 j1
+^mss == 0
+^maxDFS == 0
+for ^y 0 ^max_ape*(1+1e-9) ^max_ape/^num_pts
+
+  ! Determine normal of reference surface to trace ray along this direction
+  ^dy == 1e-6
+  ^y1 == ^y-^dy
+  ^z1 == sagf(1,1,0,^y1)
+  ^y2 == ^y
+  ^z2 == sagf(1,1,0,^y2)
+  if ^z2 <> ^z1
+    ^SurfaceTangent == (^y2 - ^y1)/(^z2 - ^z1)
+  else
+    ^SurfaceTangent == 1e6
+  end if  
+  ^NormalSlope == 1/^SurfaceTangent
+  s0 0 -(^y/^NormalSlope + ^z2)
+  if ^y=0; s0 0 1e11; end if
+  
+  rsi f1 0 ^y 1
+  ^departure == -(op s1..2)
+  if (absf(^departure) < ^DepartureNoise); ^departure == 0; end if
+  buf put b^b1 ic j6..8 (y s1) (y s2) (^departure*^SagSignFactor);   ! departure in system units
+  buf put b^b1 ic j10 (^departure*^SagSignFactor / ((frw)*1e-6)/^dimFactor)  ! departure in fringes
+  
+  ! Check if larger than current max departure
+  if absf(^departure) > absf(^maxDFS)
+    ^maxDFS == (^departure*^SagSignFactor)
+  end if 
+  
+  ! Compute slope of DFS along normal to base sphere
+  ^dy == 1e-6
+  ^y1 == ^y-^dy
+  rsi f1 0 ^y1 1
+  ^departure == (-(op s1..2)*^SagSignFactor)
+  if (absf(^departure) < ^DepartureNoise); ^departure == 0; end if
+  ^z1 == ^departure
+  ^y2 == ^y
+  rsi f1 0 ^y2 1
+  ^departure == (-(op s1..2)*^SagSignFactor)
+  if (absf(^departure) < ^DepartureNoise); ^departure == 0; end if
+  ^z2 == ^departure
+  if ^y2 <> ^y1
+    ^slope == (^z2 - ^z1)/(^y2 - ^y1)
+  else
+    ^slope == 1e6
+  end if  
+  ^mss == ^mss + ^slope**2
+  buf put b^b1 ic j9 ^slope   ! slope of the departure
+  buf mov ic+1 j1
+  
+end for
+^mss == ^mss/^num_pts
+if ^UtilityMode; ^output == ^maxDFS; end if
+
+
+
+!------------------------------------------------------
+! Calculate principal curvatures from vertex to edge
+!------------------------------------------------------
+for ^y 0 ^max_ape*(1+1e-9) ^max_ape/^num_pts
+   ^result == sasf(2, ^z, 0, ^y, ^sasfOut)
+   ^cuyMin == ^sasfOut(1)
+   ^cuyMax == ^sasfOut(2)
+   ^orientation == ^sasfOut(3) 
+   if ^orientation = 0
+      ^Crad == ^cuyMax
+      ^Ctan == ^cuyMin
+   else
+      ^Ctan == ^cuyMax
+      ^Crad == ^cuyMin
+   end if
+   buf put b^bCuy iL+1 ^y ^Crad ^Ctan ^orientation
+   ^preOrientation == ^orientation
+end for
+
+
+
+!---------------------------------------------------------------------
+! Calculate # fringes
+! Here we are using the 1D profile of waves of departure (in b^b1 j10)
+! and applying that to a 2D grid as a function of radius. So it is 
+! assuming rot. sym. which is true for supported surfaces (ASP,QCN,QBF).  
+!---------------------------------------------------------------------
+^Rmax == (buf.lst b^b1) - 1  ! Profile data begins at r=0
+out y; wri;wri "Calculating fringes..."; out n
+for ^i 1 ^Rmax*2+1
+    ^percentDone == ^i / (^Rmax*2+1) * 100
+    ^percentIncrement == 1 / (^Rmax*2+1) * 100
+    if modf(^percentDone, 10) < (^percentIncrement * 1.01)
+        out y; wri q"   '3d'% " (^percentDone - modf(^percentDone, 10)); out n
+    end if
+   for ^j 1 ^Rmax*2+1
+      ! Determine radius in units of rows & cols. Use this to grab the 
+      ! appropriate waves of dep. from the equivalent radius (in terms
+      ! of row #) in the profile data. 
+      ^radius == roundf(sqrtf((^Rmax+1 - ^i)**2 + (^Rmax+1 - ^j)**2))
+      if ^radius <= ^Rmax
+         ^waves == (buf.num b^b1 i^radius+1 j10)
+      else
+         ^waves == 0
+      end if
+      ^FringeVal == 0.25*(1 - cosf(^waves*2*^pi))   ! convert waves to fringes
+      buf put b^bFringes i^i j^j ^FringeVal
+   end for
+end for
+! out y; buf lis b^bFringes; rtn
+
+
+
+
+!------------------------------------------------------------------
+! Manage windows and generate plots
+!------------------------------------------------------------------
+wnd ope 3
+wnd plo p1..3
+wnd sca p1..3 1.3
+wnd pos p1 0 0
+wnd pos p2 5 5
+wnd pos p3 10 10
+
+
+! Plot the sags
+cls red blu
+if NOT(^UtilityMode)
+  uch
+  tit concat("Surface Sag, S", num_to_str(^s))
+  xla concat("Sag ", ^unitsStr) 
+  yla concat("Distance from vertex ", ^unitsStr)
+  yax 0
+  dpo ^RefSurfTxt
+  bim b^b1 1 3 1 1 (buf.lst b^b1)
+  end
+  dpo concat("Surface ", num_to_str(^s))
+  bim b^b1 1 4 1 2 (buf.lst b^b1)
+  end
+  go
+end if
+
+! Plot the DFS values
+cls red blu
+uch
+tit concat(concat(concat("Departure From ", ^RefSurfTxt), ", S"), num_to_str(^s))
+xla concat("DFS ", ^unitsStr)
+yla concat("Distance from vertex ", ^unitsStr)
+ann 1 concat("Surface:      ", num_to_str(^s))
+ann 2 "                                ."
+ann 3 "** A positive departure is a bump relative to the reference surface."
+yax 0
+if ^dfsAxisMax > 0; xma ^dfsAxisMax; end if
+dpo 'Along z-axis'
+bim b^b1 1 5 1 2 (buf.lst b^b1)
+end
+dpo 'Along ref. surf. normal'
+bim b^b1 1 8 1 7 (buf.lst b^b1)
+end
+go
+
+! goto quit
+
+
+! plot slope of DFS
+if NOT(^UtilityMode)
+  cls blu
+  uch
+  tit concat('Slope of Departure, S', num_to_str(^s))
+  xla "Slope of DFS"
+  yla concat("Distance from vertex ", ^unitsStr)
+  yax 0
+  dpo 'Along ref. surf. normal'
+  bim b^b1 1 9 1 7 (buf.lst b^b1)
+  end
+  go
+  cls
+end if
+
+
+! Plot fringes due to departure
+uch
+tit "Fringes of departure"
+lti "waves"
+sfp b^bFringes ia ja dis
+lev num 99
+clr rgb 1 1 1
+bac  .1 .1 .1
+go
+
+
+! Plot principal curvatures
+uch
+!yax 0  ! This will screw up plot if range is far from 0
+tit "Principal Curvatures"
+xla concat("Curvature ", ^InvUnitsStr)
+yla concat("Distance from vertex ", ^unitsStr)
+dpo "Radial"
+bim b^bCuy 1 2 1 1 (buf.lst b^bCuy) 
+end
+dpo "Tangential"
+bim b^bCuy 1 3 1 1 (buf.lst b^bCuy) 
+end
+dpo "BFS"
+1/^RadBfs 0
+1/^RadBfs (buf.num b^bCuy iL j1)
+end
+go
+
+
+! Print data
+! Need to restore lens here to access DB items
+res temp_plot_dfs
+out y
+
+! Print surface info
+wri;wri
+if (sll s^s) = ""
+  wri "Surface" concat(num_to_str(^s), ",") (typ sur s^s)
+else
+  wri "Surface" num_to_str(^s) "-" concat((sll s^s), ",") (typ sur s^s)
+end if
+wri;
+
+! List bfs radius and ref. surface
+wri;wri;
+wri q"Radius of best fit sphere  '6g.6g' '16c' " ^RadBfs ^unitsStr
+wri "  (contacts surface at vertex and edge) "
+wri
+wri
+wri
+wri "Reference surface is a " ^RefSurfTxt
+if ^rfs <> "BFS"
+  wri "   Base radius is " ^rdy_s
+end if 
+wri
+wri
+
+
+! List values
+! b^b1 values are: 
+! j1..5, y ref, y surf, ref sag, surf sag, dep along z-axis
+! j6..9, y ref, y surf, dep along normal to ref surf, slope of this dep
+buf fmt b^b1 ia j1..2 '5d.5d'
+buf fmt b^b1 ia j3..5 '5g.6g'
+buf fmt b^b1 ia j6..7 '5d.5d'
+buf fmt b^b1 ia j8 '5g.6g'
+buf fmt b^b1 ia j9..10 '6g.6g'
+wri
+wri  "Departure along z-axis";
+wri; 
+wri  "   Y Height    Y Height       Sag          Sag "
+wri q"  Ref Surface  Surface     Ref Surface   Surface     Departure" 
+if (dim) = "M"
+wri q"     (mm)        (mm)         (mm)         (mm)        (mm)       "
+else if (dim) = "C"
+wri q"     (cm)        (cm)         (cm)         (cm)        (cm)       "
+else 
+wri q"     (in)        (in)         (in)         (in)        (in)       "
+end if
+wri  "  -----------  --------    -----------  ---------    ---------"
+     !    0.00000     0.00000    -0.000000    -0.000000    -0.000000
+buf lis nol b^b1 ia j1..5
+
+wri
+wri
+wri
+wri  "Departure along normal to" ^RefSurfTxt
+wri
+wri  "   Y Height    Y Height "
+wri  "  Ref Surface  Surface     Departure    Slope of Dep.   Departure "
+if (dim) = "M"
+wri q"     (mm)        (mm)        (mm)                        (waves)       "
+else if (dim) = "C"
+wri q"     (cm)        (cm)        (cm)                        (waves)       "
+else   
+wri q"     (in)        (in)        (in)                        (waves)       "
+end if
+wri  "  -----------  --------    ---------    ------------   -------------  "
+buf lis nol b^b1 ia j6..10
+wri
+wri q" Max departure  '1d.6d' '9c' " ^maxDFS ^unitsStr
+wri "  (along reference surface normal) "
+wri
+
+wri
+wri
+wri
+wri  "Principal curvatures" 
+wri
+wri  "   Y Height       Radial      Tangential   "
+if (dim) = "M"
+wri q"     (mm)         (1/mm)        (1/mm)     "
+else if (dim) = "C"
+wri q"     (cm)         (1/cm)        (1/cm)     "
+else   
+wri q"     (in)         (1/in)        (1/in)     "
+end if
+wri  "   ---------    ---------     ----------   "
+    !    0.00000      0.000004      0.000004    
+buf fmt b^bCuy ia j1 '5d.5d'
+buf fmt b^bCuy ia j2..3 '6g.6g'
+buf lis nol b^bCuy ia j1..3
+wri
+
+
+
+
+! Print notes
+wri
+wri
+if NOT(^UtilityMode)
+  wri " * Convex surfaces are plotted with positive sag, and concave surfaces with negative sag."
+end if
+wri "** A positive departure is a bump relative to the reference surface."
+wri
+wri
+
+out n
+
+lbl QUIT
+! Restore original lens and delete temporary file
+res temp_plot_dfs
+rfn ^fname
+lib; del temp_plot_dfs.len; can
+
+! Delete buffer used
+! out y; buf lis b^b1 ia j10; wri "^b1" ^b1; out n
+buf del b^b1
+buf del b^bFringes
+buf del b^bCuy
+
+ver y
+out y
+
+

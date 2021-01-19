@@ -1,0 +1,13 @@
+RES CV_LENS:SPECTROM
+CA APE !Use only user-entered !apertures
+CLS FLD Z1 F1 FOR
+CLS FLD Z3 F1 BLU
+CLS FLD Z2 F2 RED
+CLS FLD Z3 F2 BLU
+vie;ret y y n;ofs ove s1;
+sur s0..i; nbr sur;hat y;go
+
+BSP
+PRA RUN! Perform pre-analysis
+IMA SI 6 
+GO
